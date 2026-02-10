@@ -1,106 +1,114 @@
-# PR Reviewer - Claude Code Plugin
+<p align="center">
+  <h1 align="center">PR Reviewer</h1>
+  <p align="center">
+    <strong>Claude Code Plugin for GitHub PR Review</strong>
+  </p>
+  <p align="center">
+    PR을 리뷰하고 &middot; 리뷰에 응답하고 &middot; 코드를 수정합니다
+  </p>
+</p>
 
-GitHub PR을 자동으로 리뷰하고, 리뷰 코멘트에 응답하는 Claude Code 플러그인입니다.
+<p align="center">
+  <a href="#설치">설치</a> &nbsp;&bull;&nbsp;
+  <a href="#커맨드">커맨드</a> &nbsp;&bull;&nbsp;
+  <a href="#워크플로우">워크플로우</a> &nbsp;&bull;&nbsp;
+  <a href="#라이선스">라이선스</a>
+</p>
 
-## 기능
+---
 
-### review-pr - PR 코드 리뷰
-- PR diff를 분석하여 버그, 성능/보안 이슈, 코드 품질 문제를 탐지
-- 병렬 에이전트로 빠른 리뷰 수행
-- 심각도별 분류 (Bug, Warning, Minor, Nit)
-- 사용자 승인 후 GitHub PR에 인라인 코멘트 자동 게시
+## 커맨드
 
-### resolve-reviews - 리뷰 코멘트 해결
-- PR에 달린 미해결 리뷰 코멘트를 자동으로 수집 및 분석
-- 코멘트 유형별 분류 (코드 변경, 질문, 이미 해결, 동의하지 않음, 불명확)
-- GitHub suggestion 블록 자동 감지 및 적용
-- 코드 수정 후 GitHub에 답글 자동 게시
+### `review-pr` — PR 코드 리뷰
 
-## 설치
-
-Claude Code에서 다음 명령어를 실행하세요:
-
-```
-/install-plugin https://github.com/nathankim0/pr-reviewer
-```
-
-## 사전 요구사항
-
-- [GitHub CLI (`gh`)](https://cli.github.com/) 설치 및 인증
-- `gh auth login`으로 GitHub 계정 인증 완료
-
-## 사용법
-
-### PR 코드 리뷰
+> PR diff를 분석하여 이슈를 탐지하고, GitHub에 인라인 코멘트를 게시합니다.
 
 ```
 /pr-reviewer:review-pr <PR_URL>
 ```
 
-**예시:**
-
-```
+```bash
+# 예시
 /pr-reviewer:review-pr https://github.com/owner/repo/pull/123
 ```
 
-### 리뷰 코멘트 해결
+| 심각도 | 설명 |
+|--------|------|
+| 🐛 **Bug** | 버그 또는 로직 오류 |
+| ⚠️ **Warning** | 성능 / 보안 이슈 |
+| 📝 **Minor** | 코드 품질 개선 |
+| 💅 **Nit** | 스타일 / 사소한 개선 |
+
+### `resolve-reviews` — 리뷰 코멘트 해결
+
+> PR에 달린 미해결 리뷰 코멘트를 분석하고, 코드를 수정하고, GitHub에 답글을 게시합니다.
 
 ```
-/pr-reviewer:resolve-reviews [PR_URL 또는 PR_번호]
+/pr-reviewer:resolve-reviews [PR_URL | PR_번호]
 ```
 
-**예시:**
-
-```
+```bash
+# 예시
 /pr-reviewer:resolve-reviews https://github.com/owner/repo/pull/123
 /pr-reviewer:resolve-reviews 123
-/pr-reviewer:resolve-reviews                    # 현재 브랜치의 PR 자동 감지
+/pr-reviewer:resolve-reviews          # 현재 브랜치의 PR 자동 감지
 ```
 
-## review-pr 워크플로우
+| 분류 | 설명 | 액션 |
+|------|------|------|
+| 🔧 **code_change** | 코드 변경 필요 | 코드 수정 + 답글 |
+| 💬 **question** | 질문 답변 필요 | 답글 |
+| ✅ **already_done** | 이미 반영됨 | 답글 |
+| 🤔 **disagree** | 동의하지 않음 | 답글 (근거 제시) |
+| ❓ **unclear** | 의도 불명확 | 사용자에게 확인 |
 
-1. **PR 정보 수집** - PR 메타데이터, 변경 파일, diff 추출
-2. **워크트리 생성** - PR 브랜치를 로컬에 체크아웃
-3. **병렬 코드 리뷰** - 3개 에이전트가 동시에 분석
-   - Agent A: 버그/로직 오류
-   - Agent B: 성능/보안 이슈
-   - Agent C: 코드 품질/스타일
-4. **결과 정리** - 심각도별 분류하여 표시
-5. **사용자 승인** - 게시할 코멘트 선택
-6. **인라인 코멘트 게시** - GitHub PR에 리뷰 코멘트 생성
-7. **정리** - 임시 워크트리 제거
+---
 
-## resolve-reviews 워크플로우
+## 워크플로우
 
-1. **입력 파싱 및 환경 검증** - PR 식별, 브랜치 확인
-2. **리뷰 코멘트 수집** - GraphQL로 미해결 스레드 조회
-3. **코멘트 분석 및 분류** - 5가지 카테고리로 분류
-4. **사용자 1차 승인** - 처리 방식 선택
-5. **파일별 코드 변경** - suggestion 적용, 코드 수정
-6. **변경 사항 요약 및 2차 승인** - 답글 미리보기 확인
-7. **GitHub 답글 게시** - 답글 게시 및 결과 보고
+<table>
+<tr>
+<th width="50%">review-pr</th>
+<th width="50%">resolve-reviews</th>
+</tr>
+<tr>
+<td>
 
-## 코멘트 분류 기준
+1. PR 정보 수집
+2. 워크트리 생성
+3. 병렬 코드 리뷰 (3 에이전트)
+4. 결과 정리 및 표시
+5. 사용자 승인
+6. GitHub 인라인 코멘트 게시
+7. 정리
 
-### review-pr 심각도
+</td>
+<td>
 
-| 심각도 | 아이콘 | 설명 |
-|--------|--------|------|
-| Bug | 🐛 | 버그 또는 로직 오류 |
-| Warning | ⚠️ | 성능/보안 이슈 |
-| Minor | 📝 | 코드 품질 개선 |
-| Nit | 💅 | 스타일/사소한 개선 |
+1. 입력 파싱 및 환경 검증
+2. 미해결 리뷰 코멘트 수집
+3. 코멘트 분석 및 분류
+4. 사용자 1차 승인
+5. 파일별 코드 변경
+6. 변경 사항 요약 및 2차 승인
+7. GitHub 답글 게시
 
-### resolve-reviews 카테고리
+</td>
+</tr>
+</table>
 
-| 카테고리 | 아이콘 | 설명 |
-|----------|--------|------|
-| code_change | 🔧 | 코드 변경 필요 |
-| question | 💬 | 질문 답변 필요 |
-| already_done | ✅ | 이미 반영됨 |
-| disagree | 🤔 | 동의하지 않음 |
-| unclear | ❓ | 의도 불명확 |
+---
+
+## 설치
+
+> **사전 요구사항**: [GitHub CLI (`gh`)](https://cli.github.com/) 설치 및 `gh auth login` 인증 완료
+
+```
+/install-plugin https://github.com/nathankim0/pr-reviewer
+```
+
+---
 
 ## 라이선스
 
-MIT License
+[MIT](./LICENSE)
