@@ -157,11 +157,11 @@ Step 1에서 수집한 `headRefOid`를 사용하세요.
 
 좋은 예시:
 ```
-전반적으로 DynamicHeader 터치 처리 개선 방향은 좋습니다. headerPressHandlerRef 패턴으로 zIndex 문제를 우회한 건 깔끔하네요.
+DynamicHeader 터치 처리 개선 방향 좋은 것 같아요! `contentContainer` zIndex 문제를 `ArrivedHeaderTouchOverlay` + `headerPressHandlerRef` 패턴으로 우회한 거 깔끔하고, `tempoConfig` 타입을 모델 레벨에서 정리해서 소비처 타입 캐스팅 없앤 것도 좋네요.
 
-다만 DynamicHeaderStateProvider의 useEffect에서 headerMode를 의존성에 넣으면서 의도치 않은 동작이 생길 수 있어 보입니다. 상세 내용은 인라인 코멘트로 남겼습니다.
+한 가지 신경 쓰이는 건, `DynamicHeaderStateProvider`의 `useEffect`에서 `headerMode`를 의존성 배열에 넣으면서 proposals 있는 상태에서 사용자가 헤더를 접을 수 없는 문제가 생길 수 있을 것 같아요. 자동 펼침 로직을 별도 `useEffect`로 분리하거나 `proposals.length` 변경 시에만 동작하도록 하면 어떨까요?
 
-그 외 사소한 매직 넘버 건도 같이 확인 부탁드립니다.
+나머지 `useMemo` 의존성 정리 건이랑 매직 넘버 건도 인라인 코멘트로 남겨뒀으니 확인해주세요~
 ```
 
 나쁜 예시 (이렇게 쓰지 마세요):
@@ -173,11 +173,12 @@ Step 1에서 수집한 `headRefOid`를 사용하세요.
 ```
 
 **작성 가이드라인**:
+- 동료 개발자에게 말하듯 편한 어투 (~것 같아요, ~좋네요, ~어떨까요?, ~확인해주세요~)
 - PR의 변경 의도를 먼저 인정하거나 언급
 - 가장 중요한 이슈 1~2개를 자연어로 요약
-- 나머지는 "인라인 코멘트 확인 부탁드립니다" 식으로 안내
+- 나머지는 "인라인 코멘트로 남겨뒀으니 확인해주세요" 식으로 안내
+- 코드 관련 단어(변수명, 함수명, 컴포넌트명 등)는 반드시 인라인 코드 포맷(백틱)으로 감싸기
 - 이모지, 기계적 카운트 나열, "AI 코드 리뷰 결과" 같은 제목 금지
-- 존댓말 사용, 동료에게 말하듯 자연스럽게
 
 **리뷰 생성**:
 ```bash
