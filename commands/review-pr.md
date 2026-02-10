@@ -46,6 +46,76 @@ PR URL 형식: `https://github.com/{owner}/{repo}/pull/{number}`
 - PR 제목, 작성자, 브랜치 정보
 - 변경 파일 수, 추가/삭제 라인 수
 
+### Step 1.5: 기존 리뷰 확인 및 resolve
+
+**이 단계는 재리뷰(2차 이상)일 때만 실행됩니다.** 이전에 남긴 리뷰 코멘트가 있는지 확인하고, 이후 커밋에서 반영된 건은 자동으로 resolve 처리합니다.
+
+**1) 기존 리뷰 스레드 조회**:
+
+현재 사용자(`gh api user --jq '.login'`)가 남긴 미해결 리뷰 스레드를 GraphQL로 조회합니다:
+
+```bash
+gh api graphql -f query='
+query($owner: String!, $repo: String!, $number: Int!) {
+  repository(owner: $owner, name: $repo) {
+    pullRequest(number: $number) {
+      reviewThreads(first: 100) {
+        nodes {
+          id
+          isResolved
+          isOutdated
+          path
+          line
+          comments(first: 1) {
+            nodes {
+              author { login }
+              body
+              originalCommit { oid }
+            }
+          }
+        }
+      }
+    }
+  }
+}' -F owner='{owner}' -F repo='{repo}' -F number={number}
+```
+
+현재 사용자가 작성한 미해결(`isResolved === false`) 스레드만 필터링합니다. 해당 스레드가 없으면 이 단계를 건너뛰고 Step 2로 진행합니다.
+
+**2) 반영 여부 확인**:
+
+각 기존 코멘트에 대해:
+- 코멘트가 달린 커밋(`originalCommit.oid`)과 현재 HEAD(`headRefOid`) 사이의 diff를 확인:
+  ```bash
+  gh api repos/{owner}/{repo}/compare/{original_commit_oid}...{head_ref_oid} --jq '.files[].filename'
+  ```
+- 코멘트가 달린 파일이 이후 커밋에서 변경되었으면 → 워크트리(Step 2)에서 해당 파일의 현재 코드를 Read하여 코멘트의 지적 사항이 **실제로 반영되었는지** 판단
+- `isOutdated === true`라도 반영 여부는 코드를 직접 읽어서 판단 (라인 변경 ≠ 반영)
+
+**3) resolve 처리**:
+
+반영이 확인된 스레드는 GraphQL mutation으로 resolve 처리합니다:
+```bash
+gh api graphql -f query='
+mutation($threadId: ID!) {
+  resolveReviewThread(input: { threadId: $threadId }) {
+    thread { isResolved }
+  }
+}' -f threadId='{thread_node_id}'
+```
+
+**4) 결과 표시**:
+```
+## 기존 리뷰 확인 결과
+
+| # | 파일 | 이전 코멘트 (요약) | 상태 |
+|---|------|-------------------|------|
+| 1 | file.ts:42 | `useEffect` 의존성 문제 | Resolved |
+| 2 | file.ts:58 | 매직 넘버 | 미반영 |
+```
+
+미반영된 코멘트가 있으면 사용자에게 알려주고, 이후 Step 3 리뷰에서 동일 이슈를 중복으로 지적하지 않습니다.
+
 ### Step 2: 워크트리 생성
 
 PR 코드를 로컬에서 분석하기 위해 워크트리를 생성합니다:
@@ -95,6 +165,7 @@ REVIEW_DIR="/tmp/pr-review-{owner}-{repo}-{number}"
 - `line`은 반드시 **PR의 diff에서 변경된 라인**이어야 합니다 (추가된 라인 기준). 변경되지 않은 라인에 코멘트를 달지 마세요.
 - `path`는 레포지토리 루트 기준 상대 경로여야 합니다.
 - 사소하지 않은 실제 이슈만 보고하세요. 불필요한 nit-pick은 최소화하세요.
+- **재리뷰 시**: Step 1.5에서 아직 미반영으로 남은 기존 코멘트와 동일한 이슈를 중복 지적하지 마세요. 기존 코멘트 목록을 에이전트에게 함께 전달하세요.
 - 반드시 유효한 JSON 배열만 출력하세요.
 
 ### Step 4: 결과 정리 및 표시
@@ -214,6 +285,14 @@ rm -rf /tmp/pr-review-{owner}-{repo}-{number}
 
 완료 메시지를 출력하세요:
 ```
-✅ PR #{number} 리뷰 완료! GitHub에 {N}개의 인라인 코멘트가 게시되었습니다.
-🔗 {PR_URL}
+PR #{number} 리뷰 완료! GitHub에 {N}개의 인라인 코멘트가 게시되었습니다.
+{PR_URL}
+```
+
+재리뷰인 경우 resolve 결과도 함께 표시:
+```
+PR #{number} 리뷰 완료!
+- 기존 코멘트 {M}개 중 {R}개 resolved
+- 새 코멘트 {N}개 게시
+{PR_URL}
 ```
