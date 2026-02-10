@@ -205,9 +205,11 @@ REVIEW_DIR="/tmp/pr-review-{owner}-{repo}-{number}"
 | ... | ... | ... | ... |
 ```
 
-발견된 이슈가 없으면 "리뷰 결과 이슈가 없습니다. 코드가 깔끔합니다!" 라고 알리고, 워크트리를 정리한 뒤 종료하세요.
+발견된 이슈가 없으면 "리뷰 결과 이슈가 없습니다. 코드가 깔끔합니다!" 라고 알리고, **Step 5는 건너뛰고 Step 5.5로** 진행하세요 (Approve 여부 확인).
 
-### Step 5: 사용자 승인
+### Step 5: 사용자 승인 (코멘트 게시 여부)
+
+**이슈가 있을 때만 실행합니다.** (이슈가 없으면 Step 5.5로 건너뜁니다.)
 
 AskUserQuestion 도구를 사용하여 사용자에게 확인하세요:
 
@@ -220,9 +222,36 @@ AskUserQuestion 도구를 사용하여 사용자에게 확인하세요:
 
 사용자가 "게시하지 않음"을 선택하면 워크트리를 정리하고 종료하세요.
 
-### Step 6: GitHub 인라인 코멘트 게시
+### Step 5.5: 리뷰 액션 선택
 
-사용자가 승인한 코멘트들을 GitHub PR에 게시합니다.
+코멘트 게시와 함께 PR에 대한 리뷰 액션을 결정합니다. AskUserQuestion으로 확인하세요.
+
+**심각도 기반 추천 로직**:
+- **Bug 이슈가 없을 때** → Approve 추천
+- **Bug 이슈가 있을 때** → Request Changes 추천
+
+**질문**: "리뷰 액션을 선택해주세요."
+
+**옵션 (Bug 없을 때)**:
+1. "Approve (추천)" - PR을 승인합니다
+2. "Request Changes" - 변경을 요청합니다
+3. "Comment만" - 액션 없이 코멘트만 남깁니다
+
+**옵션 (Bug 있을 때)**:
+1. "Request Changes (추천)" - 변경을 요청합니다
+2. "Approve" - PR을 승인합니다
+3. "Comment만" - 액션 없이 코멘트만 남깁니다
+
+선택에 따라 리뷰 API의 `event` 값이 결정됩니다:
+| 선택 | `event` 값 |
+|------|-----------|
+| Approve | `APPROVE` |
+| Request Changes | `REQUEST_CHANGES` |
+| Comment만 | `COMMENT` |
+
+### Step 6: GitHub 리뷰 게시
+
+사용자가 선택한 코멘트와 리뷰 액션을 GitHub PR에 게시합니다.
 
 **head SHA 가져오기**:
 Step 1에서 수집한 `headRefOid`를 사용하세요.
@@ -255,13 +284,18 @@ DynamicHeader 터치 처리 개선 방향 좋은 것 같아요! `contentContaine
 - 나머지는 "인라인 코멘트로 남겨뒀으니 확인해주세요" 식으로 안내
 - 코드 관련 단어(변수명, 함수명, 컴포넌트명 등)는 반드시 인라인 코드 포맷(백틱)으로 감싸기
 - 이모지, 기계적 카운트 나열, "AI 코드 리뷰 결과" 같은 제목 금지
+- **Approve 시**: 본문 톤을 긍정적으로 마무리 (~좋은 것 같아요!, 깔끔하네요~)
+- **Request Changes 시**: 수정이 필요한 핵심 이유를 자연스럽게 언급
 
 **리뷰 생성**:
+
+`{event}`는 Step 5.5에서 선택한 값 (`APPROVE`, `REQUEST_CHANGES`, 또는 `COMMENT`)을 사용합니다.
+
 ```bash
 cat <<'JSON' | gh api repos/{owner}/{repo}/pulls/{number}/reviews --method POST --input -
 {
   "commit_id": "{head_sha}",
-  "event": "COMMENT",
+  "event": "{event}",
   "body": "{위 규칙에 따라 작성한 자연스러운 리뷰 본문}",
   "comments": [
     {
@@ -274,12 +308,23 @@ cat <<'JSON' | gh api repos/{owner}/{repo}/pulls/{number}/reviews --method POST 
 JSON
 ```
 
+**이슈가 없어서 코멘트 없이 Approve만 하는 경우**:
+```bash
+cat <<'JSON' | gh api repos/{owner}/{repo}/pulls/{number}/reviews --method POST --input -
+{
+  "commit_id": "{head_sha}",
+  "event": "APPROVE",
+  "body": "{PR 변경 내용을 언급하며 자연스럽게 승인하는 본문}"
+}
+JSON
+```
+
 **주의사항**:
 - `comments` 배열에는 사용자가 승인한 심각도의 코멘트만 포함
 - JSON이 유효한지 확인 (특수문자 이스케이프 필요)
 - API 호출 실패 시 에러 메시지를 사용자에게 보여주세요
 
-게시 성공 시 PR URL을 다시 안내하세요.
+게시 성공 시 PR URL과 리뷰 액션을 안내하세요.
 
 ### Step 7: 정리
 
@@ -288,15 +333,18 @@ JSON
 rm -rf /tmp/pr-review-{owner}-{repo}-{number}
 ```
 
-완료 메시지를 출력하세요:
+완료 메시지를 출력하세요 (리뷰 액션 포함):
 ```
-PR #{number} 리뷰 완료! GitHub에 {N}개의 인라인 코멘트가 게시되었습니다.
+PR #{number} 리뷰 완료!
+- 리뷰 액션: {Approved / Changes Requested / Commented}
+- 인라인 코멘트: {N}개 게시
 {PR_URL}
 ```
 
 재리뷰인 경우 resolve 결과도 함께 표시:
 ```
 PR #{number} 리뷰 완료!
+- 리뷰 액션: {Approved / Changes Requested / Commented}
 - 기존 코멘트 {M}개 중 {R}개 resolved
 - 새 코멘트 {N}개 게시
 {PR_URL}
