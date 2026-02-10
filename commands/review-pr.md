@@ -42,80 +42,41 @@ PR URL 형식: `https://github.com/{owner}/{repo}/pull/{number}`
    gh pr diff {number} --repo {owner}/{repo}
    ```
 
+3. **기존 리뷰 스레드 조회** (항상 실행):
+
+   현재 사용자의 미해결 리뷰 스레드를 함께 조회합니다:
+   ```bash
+   gh api user --jq '.login'
+   ```
+   ```bash
+   gh api graphql -F owner='{owner}' -F repo='{repo}' -F number={number} -f query='
+   query($owner: String!, $repo: String!, $number: Int!) {
+     repository(owner: $owner, name: $repo) {
+       pullRequest(number: $number) {
+         reviewThreads(first: 100) {
+           nodes {
+             id
+             isResolved
+             isOutdated
+             path
+             line
+             comments(first: 1) {
+               nodes {
+                 author { login }
+                 body
+                 originalCommit { oid }
+               }
+             }
+           }
+         }
+       }
+     }
+   }'
+   ```
+
 수집한 정보를 요약하여 사용자에게 보여주세요:
 - PR 제목, 작성자, 브랜치 정보
 - 변경 파일 수, 추가/삭제 라인 수
-
-### Step 1.5: 기존 리뷰 확인 및 resolve
-
-**이 단계는 재리뷰(2차 이상)일 때만 실행됩니다.** 이전에 남긴 리뷰 코멘트가 있는지 확인하고, 이후 커밋에서 반영된 건은 자동으로 resolve 처리합니다.
-
-**1) 기존 리뷰 스레드 조회**:
-
-현재 사용자(`gh api user --jq '.login'`)가 남긴 미해결 리뷰 스레드를 GraphQL로 조회합니다:
-
-**주의**: GraphQL 변수를 전달할 때 `-F` (대문자) 플래그를 사용하세요.
-
-```bash
-gh api graphql -F owner='{owner}' -F repo='{repo}' -F number={number} -f query='
-query($owner: String!, $repo: String!, $number: Int!) {
-  repository(owner: $owner, name: $repo) {
-    pullRequest(number: $number) {
-      reviewThreads(first: 100) {
-        nodes {
-          id
-          isResolved
-          isOutdated
-          path
-          line
-          comments(first: 1) {
-            nodes {
-              author { login }
-              body
-              originalCommit { oid }
-            }
-          }
-        }
-      }
-    }
-  }
-}'
-```
-
-현재 사용자가 작성한 미해결(`isResolved === false`) 스레드만 필터링합니다. 해당 스레드가 없으면 이 단계를 건너뛰고 Step 2로 진행합니다.
-
-**2) 반영 여부 확인**:
-
-각 기존 코멘트에 대해:
-- 코멘트가 달린 커밋(`originalCommit.oid`)과 현재 HEAD(`headRefOid`) 사이의 diff를 확인:
-  ```bash
-  gh api repos/{owner}/{repo}/compare/{original_commit_oid}...{head_ref_oid} --jq '.files[].filename'
-  ```
-- 코멘트가 달린 파일이 이후 커밋에서 변경되었으면 → 워크트리(Step 2)에서 해당 파일의 현재 코드를 Read하여 코멘트의 지적 사항이 **실제로 반영되었는지** 판단
-- `isOutdated === true`라도 반영 여부는 코드를 직접 읽어서 판단 (라인 변경 ≠ 반영)
-
-**3) resolve 처리**:
-
-반영이 확인된 스레드는 GraphQL mutation으로 resolve 처리합니다.
-
-**중요**: GraphQL 변수 문법(`$var`)은 bash `$` 해석 문제를 일으킬 수 있으므로, mutation은 반드시 **인라인 값**으로 작성하세요:
-```bash
-gh api graphql -f query='mutation { resolveReviewThread(input: { threadId: "{thread_node_id}" }) { thread { isResolved } } }'
-```
-
-각 스레드별로 개별 호출하세요. `{thread_node_id}`는 GraphQL 조회에서 얻은 스레드의 `id` 필드 값입니다.
-
-**4) 결과 표시**:
-```
-## 기존 리뷰 확인 결과
-
-| # | 파일 | 이전 코멘트 (요약) | 상태 |
-|---|------|-------------------|------|
-| 1 | file.ts:42 | `useEffect` 의존성 문제 | Resolved |
-| 2 | file.ts:58 | 매직 넘버 | 미반영 |
-```
-
-미반영된 코멘트가 있으면 사용자에게 알려주고, 이후 Step 3 리뷰에서 동일 이슈를 중복으로 지적하지 않습니다.
 
 ### Step 2: 워크트리 생성
 
@@ -133,6 +94,47 @@ REVIEW_DIR="/tmp/pr-review-{owner}-{repo}-{number}"
   `{headRefName}`은 Step 1에서 수집한 PR의 head 브랜치명입니다.
 - 클론 실패 시 사용자에게 알리고 중단
 
+### Step 2.5: 기존 리뷰 확인 및 resolve
+
+**현재 사용자가 남긴 미해결(`isResolved === false`) 스레드**가 있으면 이 단계를 실행합니다. 없으면 Step 3으로 진행합니다.
+
+**1) 반영 여부 확인**:
+
+코멘트가 달린 커밋(`originalCommit.oid`)과 현재 HEAD(`headRefOid`)가 다른 경우, 이후 커밋에서 변경된 파일을 확인합니다:
+```bash
+gh api repos/{owner}/{repo}/compare/{original_commit_oid}...{head_ref_oid} --jq '.files[].filename'
+```
+
+각 기존 코멘트에 대해:
+- 코멘트가 달린 파일이 이후 커밋에서 변경되었으면 → **워크트리(`$REVIEW_DIR`)에서 해당 파일의 현재 코드를 Read**하여 코멘트의 지적 사항이 **실제로 반영되었는지** 판단
+- `isOutdated === true`라도 반영 여부는 코드를 직접 읽어서 판단 (라인 변경 ≠ 반영)
+- 파일이 변경되지 않았으면 → 미반영으로 판단
+
+**2) resolve 처리**:
+
+반영이 확인된 스레드는 GraphQL mutation으로 resolve 처리합니다.
+
+**중요**: GraphQL 변수 문법(`$var`)은 bash `$` 해석 문제를 일으킬 수 있으므로, mutation은 반드시 **인라인 값**으로 작성하세요:
+```bash
+gh api graphql -f query='mutation { resolveReviewThread(input: { threadId: "{thread_node_id}" }) { thread { isResolved } } }'
+```
+
+각 스레드별로 개별 호출하세요. `{thread_node_id}`는 GraphQL 조회에서 얻은 스레드의 `id` 필드 값입니다.
+
+**반영된 스레드가 여러 개이면 병렬로 resolve 처리하세요.**
+
+**3) 결과 표시**:
+```
+## 기존 리뷰 확인 결과
+
+| # | 파일 | 이전 코멘트 (요약) | 상태 |
+|---|------|-------------------|------|
+| 1 | file.ts:42 | `useEffect` 의존성 문제 | Resolved |
+| 2 | file.ts:58 | 매직 넘버 | 미반영 |
+```
+
+미반영된 코멘트가 있으면 사용자에게 알려주고, 이후 Step 3 리뷰에서 동일 이슈를 중복으로 지적하지 않습니다.
+
 ### Step 3: 병렬 코드 리뷰
 
 **중요**: diff에서 변경된 파일들만 리뷰 대상입니다. 변경되지 않은 파일은 리뷰하지 않습니다.
@@ -141,6 +143,7 @@ REVIEW_DIR="/tmp/pr-review-{owner}-{repo}-{number}"
 - 리뷰 디렉토리 경로 (`$REVIEW_DIR`)
 - 변경된 파일 목록
 - PR diff 내용
+- (재리뷰 시) 기존 미반영 코멘트 목록 — 동일 이슈 중복 지적 방지용
 
 #### Agent A: 버그/로직 오류 탐지
 - 널 참조, 타입 불일치, 잘못된 조건문
@@ -167,13 +170,12 @@ REVIEW_DIR="/tmp/pr-review-{owner}-{repo}-{number}"
 - **출력 형식**: JSON 배열 `[{"path": "파일경로", "line": 라인번호, "body": "**[Minor]** 또는 **[Nit]** 설명", "severity": "minor|nit"}]`
 
 **각 에이전트 주의사항**:
-- `line`은 반드시 **PR의 diff에서 변경된 라인**이어야 합니다 (추가된 라인 기준). 변경되지 않은 라인에 코멘트를 달지 마세요.
+- `line`은 반드시 **PR diff의 hunk 범위 내에 있는 라인**이어야 합니다 (새 파일 기준 라인 번호). diff hunk 밖의 라인에 코멘트를 달면 GitHub API가 422 에러를 반환합니다.
 - `path`는 레포지토리 루트 기준 상대 경로여야 합니다.
 - 사소하지 않은 실제 이슈만 보고하세요. 불필요한 nit-pick은 최소화하세요.
-- **재리뷰 시**: Step 1.5에서 아직 미반영으로 남은 기존 코멘트와 동일한 이슈를 중복 지적하지 마세요. 기존 코멘트 목록을 에이전트에게 함께 전달하세요.
 - 반드시 유효한 JSON 배열만 출력하세요.
 
-### Step 4: 결과 정리 및 표시
+### Step 4: 결과 정리 및 라인 검증
 
 3개 에이전트의 결과를 병합하고 심각도별로 정리하세요:
 
@@ -185,6 +187,17 @@ REVIEW_DIR="/tmp/pr-review-{owner}-{repo}-{number}"
 | Nit | 스타일/사소한 개선 |
 
 **심각도 표기는 이모지 없이 텍스트(`[Bug]`, `[Warning]`, `[Minor]`, `[Nit]`)로만 표시합니다.**
+
+#### 라인 검증 (중요)
+
+GitHub PR Review API는 **diff hunk 범위 내의 라인에만** 코멘트를 달 수 있습니다. 범위 밖 라인에 코멘트하면 `422 Unprocessable Entity` 에러가 발생합니다.
+
+**검증 방법**: PR diff의 각 hunk 헤더 (`@@ -old_start,old_count +new_start,new_count @@`)에서 `new_start`와 `new_count`를 파싱하여, 각 코멘트의 `line`이 `[new_start, new_start + new_count - 1]` 범위 내에 있는지 확인합니다.
+
+**범위 밖 코멘트 처리**:
+- diff hunk 범위 밖의 코멘트는 인라인 코멘트에서 제외
+- 대신 리뷰 body 본문에 해당 내용을 포함시킵니다
+- 사용자에게 "일부 코멘트는 diff 범위 밖이라 본문에 포함했습니다"라고 안내
 
 사용자에게 테이블 형태로 보여주세요:
 
@@ -286,6 +299,8 @@ DynamicHeader 터치 처리 개선 방향 좋은 것 같아요! `contentContaine
 - 이모지, 기계적 카운트 나열, "AI 코드 리뷰 결과" 같은 제목 금지
 - **Approve 시**: 본문 톤을 긍정적으로 마무리 (~좋은 것 같아요!, 깔끔하네요~)
 - **Request Changes 시**: 수정이 필요한 핵심 이유를 자연스럽게 언급
+- **재리뷰 시**: 이전 코멘트 반영 결과를 자연스럽게 언급 (예: "이전 피드백 잘 반영해주셨네요!")
+- **diff 범위 밖 코멘트가 있으면**: 본문에 해당 내용을 포함 (예: "추가로 diff 범위 밖이라 인라인 코멘트로 남기지 못한 부분이 있어요: ...")
 
 **리뷰 생성**:
 
@@ -321,8 +336,10 @@ JSON
 
 **주의사항**:
 - `comments` 배열에는 사용자가 승인한 심각도의 코멘트만 포함
+- **라인 검증을 통과한 코멘트만** `comments` 배열에 포함 (Step 4에서 검증)
 - JSON이 유효한지 확인 (특수문자 이스케이프 필요)
 - API 호출 실패 시 에러 메시지를 사용자에게 보여주세요
+- **422 에러 발생 시**: 문제가 되는 코멘트를 제거하고 나머지만 재시도
 
 게시 성공 시 PR URL과 리뷰 액션을 안내하세요.
 
@@ -341,7 +358,7 @@ PR #{number} 리뷰 완료!
 {PR_URL}
 ```
 
-재리뷰인 경우 resolve 결과도 함께 표시:
+기존 리뷰 코멘트가 있었던 경우 resolve 결과도 함께 표시:
 ```
 PR #{number} 리뷰 완료!
 - 리뷰 액션: {Approved / Changes Requested / Commented}
