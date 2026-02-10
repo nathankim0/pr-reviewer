@@ -1,0 +1,10 @@
+{
+  "name": "pr-reviewer",
+  "owner": "nathankim0",
+  "plugins": [
+    {
+      "name": "pr-reviewer",
+      "path": ".."
+    }
+  ]
+}

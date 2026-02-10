@@ -1,0 +1,7 @@
+{
+  "name": "pr-reviewer",
+  "description": "Automated PR code review with inline GitHub comments",
+  "author": "nathankim0",
+  "repository": "https://github.com/nathankim0/pr-reviewer",
+  "version": "1.0.0"
+}
