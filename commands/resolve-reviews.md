@@ -103,6 +103,14 @@ query($owner: String!, $repo: String!, $number: Int!) {
 2. 스레드의 첫 번째 코멘트 작성자가 PR 작성자(`author.login`)와 같으면 제외 (자기 자신의 코멘트)
 3. `isOutdated === true`인 스레드는 별도 표시 (코드가 이미 변경됨)
 
+**Outdated 스레드 diff 검증**:
+`isOutdated === true`인 스레드에 대해서는 해당 파일의 변경 이력을 확인하여 실제로 반영되었는지 판단합니다:
+```bash
+git diff {base_branch}...HEAD -- {file_path}
+```
+- diff에서 코멘트가 지적한 라인이 이미 수정되었으면 → Step 2에서 자동으로 `already_done`으로 분류
+- diff에서 해당 라인이 변경되지 않았으면 → 여전히 미해결로 간주하여 정상 분류 진행
+
 미해결 코멘트가 없으면 "미해결 리뷰 코멘트가 없습니다! 모든 리뷰가 해결되었습니다." 라고 안내하고 종료하세요.
 
 파일별로 그룹핑하여 사용자에게 보여주세요:
@@ -120,6 +128,7 @@ query($owner: String!, $repo: String!, $number: Int!) {
 각 코멘트를 분석하여 5가지 카테고리로 분류하세요. 분류 시 다음을 고려합니다:
 - 코멘트 내용과 맥락
 - 현재 코드 상태 (파일을 Read하여 확인)
+- Step 1에서 수행한 diff 검증 결과 (`isOutdated` + diff 확인으로 이미 반영된 코멘트는 자동 `already_done`)
 - GitHub suggestion 블록 포함 여부
 
 **카테고리**:
