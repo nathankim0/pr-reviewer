@@ -99,6 +99,68 @@
 
 ---
 
+## 사용 예시
+
+### review-pr — 3차 재리뷰
+
+```
+❯ 이제 이거 PR 198에 3차 리뷰 다시 해봐
+```
+
+**Step 1: PR 정보 수집**
+
+```
+PR: fix(mobile): DynamicHeader 제스처/터치 복구 및 키보드 dismiss 처리
+작성자: somangoi
+브랜치: b2c-4023 → stage
+변경: 8 파일, +188/-102
+```
+
+**Step 1.5: 기존 리뷰 확인 및 resolve**
+
+이전 리뷰 스레드를 GraphQL API로 조회하여 반영 여부를 확인합니다. 반영 완료된 스레드는 자동 resolve 처리합니다.
+
+```
+┌───┬────────────────────────────────┬───────────────────────────────────────────┬──────────────────────────┐
+│ # │              파일              │            이전 코멘트 (요약)             │           상태           │
+├───┼────────────────────────────────┼───────────────────────────────────────────┼──────────────────────────┤
+│ 1 │ MainDrawerNavigator.tsx        │ collapsed 상태 터치 오버레이 미확인       │ Resolved (이전)          │
+│ 2 │ DynamicHeaderStateProvider.tsx │ useMemo deps 누락                        │ Resolved (이전)          │
+│ 3 │ MainDrawerNavigator.tsx        │ as const 불필요                          │ Resolved (이전)          │
+│ 4 │ DynamicHeaderStateProvider.tsx │ headerMode useEffect deps 무한 되돌림    │ Resolved (이전)          │
+│ 5 │ DynamicHeaderStateProvider.tsx │ useMemo deps 불필요                      │ Resolved (이전)          │
+│ 6 │ HealthPlatformScreen.tsx       │ 매직 넘버 10                             │ Resolved (방금) - 반영됨 │
+└───┴────────────────────────────────┴───────────────────────────────────────────┴──────────────────────────┘
+```
+
+**Step 2–3: 워크트리 생성 → 병렬 코드 리뷰**
+
+3개 에이전트가 병렬로 코드를 분석합니다.
+
+```
+├─ Agent A: 버그/로직 오류 탐지
+├─ Agent B: 성능/보안 이슈 탐지
+└─ Agent C: 코드 품질/스타일 탐지
+```
+
+**Step 4: 결과 정리**
+
+```
+총 2개 이슈 발견: Bug 0 · Warning 0 · Minor 1 · Nit 1
+
+Minor — MainDrawerNavigator.tsx:90
+  높이 계산이 DynamicHeaderStateProvider와 중복. 추후 불일치 위험.
+
+Nit — MainDrawerNavigator.tsx:212
+  zIndex: 9999 매직 넘버. 상수로 분리하면 의도가 명확해짐.
+```
+
+**Step 5: 사용자 승인**
+
+코멘트 게시 여부와 리뷰 액션(Approve / Request Changes / Comment)을 선택합니다.
+
+---
+
 ## 설치
 
 > **사전 요구사항**: [GitHub CLI (`gh`)](https://cli.github.com/) 설치 및 `gh auth login` 인증 완료
