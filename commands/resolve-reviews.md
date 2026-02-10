@@ -63,8 +63,10 @@ allowed-tools: Bash(gh *), Bash(git status *), Bash(git log *), Bash(git diff *)
 
 GraphQL API로 미해결 리뷰 스레드를 조회합니다:
 
+**주의**: GraphQL 변수를 전달할 때 `-F` (대문자) 플래그를 사용하세요. `-f` (소문자)는 문자열로만 전달하므로 `Int!` 등 타입 변환이 안 됩니다.
+
 ```bash
-gh api graphql -f query='
+gh api graphql -F owner='{owner}' -F repo='{repo}' -F number={number} -f query='
 query($owner: String!, $repo: String!, $number: Int!) {
   repository(owner: $owner, name: $repo) {
     pullRequest(number: $number) {
@@ -95,7 +97,7 @@ query($owner: String!, $repo: String!, $number: Int!) {
       }
     }
   }
-}' -F owner='{owner}' -F repo='{repo}' -F number={number}
+}'
 ```
 
 **필터링 규칙**:

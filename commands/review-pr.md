@@ -54,8 +54,10 @@ PR URL 형식: `https://github.com/{owner}/{repo}/pull/{number}`
 
 현재 사용자(`gh api user --jq '.login'`)가 남긴 미해결 리뷰 스레드를 GraphQL로 조회합니다:
 
+**주의**: GraphQL 변수를 전달할 때 `-F` (대문자) 플래그를 사용하세요.
+
 ```bash
-gh api graphql -f query='
+gh api graphql -F owner='{owner}' -F repo='{repo}' -F number={number} -f query='
 query($owner: String!, $repo: String!, $number: Int!) {
   repository(owner: $owner, name: $repo) {
     pullRequest(number: $number) {
@@ -77,7 +79,7 @@ query($owner: String!, $repo: String!, $number: Int!) {
       }
     }
   }
-}' -F owner='{owner}' -F repo='{repo}' -F number={number}
+}'
 ```
 
 현재 사용자가 작성한 미해결(`isResolved === false`) 스레드만 필터링합니다. 해당 스레드가 없으면 이 단계를 건너뛰고 Step 2로 진행합니다.
@@ -94,15 +96,14 @@ query($owner: String!, $repo: String!, $number: Int!) {
 
 **3) resolve 처리**:
 
-반영이 확인된 스레드는 GraphQL mutation으로 resolve 처리합니다:
+반영이 확인된 스레드는 GraphQL mutation으로 resolve 처리합니다.
+
+**중요**: GraphQL 변수 문법(`$var`)은 bash `$` 해석 문제를 일으킬 수 있으므로, mutation은 반드시 **인라인 값**으로 작성하세요:
 ```bash
-gh api graphql -f query='
-mutation($threadId: ID!) {
-  resolveReviewThread(input: { threadId: $threadId }) {
-    thread { isResolved }
-  }
-}' -f threadId='{thread_node_id}'
+gh api graphql -f query='mutation { resolveReviewThread(input: { threadId: "{thread_node_id}" }) { thread { isResolved } } }'
 ```
+
+각 스레드별로 개별 호출하세요. `{thread_node_id}`는 GraphQL 조회에서 얻은 스레드의 `id` 필드 값입니다.
 
 **4) 결과 표시**:
 ```
@@ -125,7 +126,11 @@ REVIEW_DIR="/tmp/pr-review-{owner}-{repo}-{number}"
 ```
 
 - 이미 해당 디렉토리가 존재하면 제거 후 재생성
-- `gh repo clone {owner}/{repo} $REVIEW_DIR` 후 `cd $REVIEW_DIR && gh pr checkout {number}`
+- **PR 브랜치를 직접 클론** (shallow clone + `gh pr checkout` 조합은 브랜치 ref를 찾지 못하는 문제가 발생할 수 있음):
+  ```bash
+  gh repo clone {owner}/{repo} $REVIEW_DIR -- --single-branch --branch {headRefName}
+  ```
+  `{headRefName}`은 Step 1에서 수집한 PR의 head 브랜치명입니다.
 - 클론 실패 시 사용자에게 알리고 중단
 
 ### Step 3: 병렬 코드 리뷰
