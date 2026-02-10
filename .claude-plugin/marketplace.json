@@ -1,10 +1,23 @@
 {
   "name": "pr-reviewer",
-  "owner": "nathankim0",
+  "owner": {
+    "name": "nathankim0",
+    "email": "nathankim0@github.com"
+  },
+  "metadata": {
+    "description": "PR 자동 코드 리뷰 플러그인 마켓플레이스"
+  },
   "plugins": [
     {
       "name": "pr-reviewer",
-      "path": ".."
+      "source": "./",
+      "description": "GitHub PR을 자동 리뷰하고 인라인 코멘트를 게시하는 플러그인",
+      "version": "1.0.0",
+      "author": {
+        "name": "nathankim0"
+      },
+      "keywords": ["pr-review", "code-review", "github", "automation"],
+      "strict": false
     }
   ]
 }
