@@ -12,7 +12,25 @@
 
 ---
 
-allowed-tools: Bash(gh *), Bash(git worktree *), Bash(git *), Bash(rm -rf /tmp/pr-review-*), Bash(cat *), Bash(wc *), Read, Grep, Glob, Task
+allowed-tools: Bash(gh *), Bash(git worktree *), Bash(git *), Bash(rm -rf /tmp/pr-review-*), Bash(cat *), Bash(wc *), Read, Grep, Glob, Task, AskUserQuestion
+
+---
+
+## !! 필수 준수 사항 !!
+
+**이 워크플로우의 모든 Step은 반드시 순서대로 실행해야 합니다. 단 하나의 Step도 건너뛰거나 생략할 수 없습니다.**
+
+절대 하지 말아야 할 것:
+- ❌ diff만 읽고 직접 리뷰를 작성하는 것 — 반드시 Task 도구로 에이전트를 실행하세요
+- ❌ 워크트리(Step 2) 생성을 건너뛰는 것 — 에이전트가 전체 파일 컨텍스트를 읽어야 합니다
+- ❌ 사용자에게 리뷰 관점을 묻지 않는 것 (Step 1.5) — 반드시 AskUserQuestion으로 확인하세요
+- ❌ 사용자에게 게시 여부를 묻지 않는 것 (Step 5) — 반드시 AskUserQuestion으로 확인하세요
+- ❌ 사용자에게 리뷰 액션을 묻지 않는 것 (Step 5.5) — 반드시 AskUserQuestion으로 확인하세요
+- ❌ GitHub API로 리뷰를 게시하지 않는 것 (Step 6) — 최종 목표는 GitHub에 리뷰를 남기는 것입니다
+
+**체크포인트**: 각 Step 완료 후 다음 Step으로 넘어가기 전에, 해당 Step이 실제로 실행되었는지 확인하세요.
+
+---
 
 ## 입력 파싱
 
@@ -26,7 +44,9 @@ PR URL 형식: `https://github.com/{owner}/{repo}/pull/{number}`
 
 ## 워크플로우
 
-아래 단계를 순서대로 수행하세요. **모든 출력은 한글로** 작성합니다.
+아래 단계를 **반드시 순서대로, 빠짐없이** 수행하세요. **모든 출력은 한글로** 작성합니다.
+
+**실행 순서**: Step 1 → Step 1.5 → Step 2 → Step 2.5 → Step 3 → Step 4 → Step 5 → Step 5.5 → Step 6 → Step 7
 
 ### Step 1: PR 정보 수집
 
@@ -162,6 +182,8 @@ gh api graphql -f query='mutation { resolveReviewThread(input: { threadId: "{thr
 ### Step 3: 병렬 코드 리뷰
 
 **중요**: diff에서 변경된 파일들만 리뷰 대상입니다. 변경되지 않은 파일은 리뷰하지 않습니다.
+
+**!! 절대로 직접 리뷰를 작성하지 마세요 !!** 반드시 아래의 Task 에이전트를 실행하여 리뷰를 수행해야 합니다. 당신이 diff를 읽고 직접 이슈를 작성하는 것은 금지됩니다.
 
 **Step 1.5에서 선택한 리뷰 관점에 따라** 해당 에이전트만 실행합니다. 각 에이전트(Task 도구 사용)에게 다음 정보를 제공하세요:
 - 리뷰 디렉토리 경로 (`$REVIEW_DIR`)
