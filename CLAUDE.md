@@ -21,3 +21,10 @@
 3. GitHub 릴리스 생성: `gh release create v{version} --title "v{version} - {요약}" --notes "{릴리스 노트}"`
 
 > `plugin.json`, `marketplace.json`의 version과 git tag는 항상 일치해야 한다.
+
+## 버전 올리는 기준 (Semantic Versioning)
+
+| 구분 | 기준 | 커밋 접두사 |
+|------|------|------------|
+| **Minor** (1.**X**.0) | 사용자가 체감하는 새 기능 추가 | `feat:` |
+| **Patch** (1.0.**X**) | 버그 수정, 기존 기능 개선, 문서 변경 | `fix:`, `docs:`, `chore:` |
