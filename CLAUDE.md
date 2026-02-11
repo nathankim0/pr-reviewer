@@ -11,3 +11,13 @@
 3. `claude plugin uninstall pr-reviewer@pr-reviewer` → `claude plugin install pr-reviewer@pr-reviewer`
 
 > 버전이 동일하면 `update`가 동작하지 않으므로 반드시 `uninstall` → `install`로 재설치한다.
+
+## 버전 업데이트 시 릴리스 배포 절차
+
+`plugin.json`의 `version`을 올릴 때 반드시 아래 절차를 **추가로** 수행할 것:
+
+1. `plugin.json`과 `marketplace.json`의 `version`을 **동일하게** 업데이트
+2. 커밋 및 푸시 후, 해당 커밋에 태그 생성: `git tag v{version}` → `git push origin v{version}`
+3. GitHub 릴리스 생성: `gh release create v{version} --title "v{version} - {요약}" --notes "{릴리스 노트}"`
+
+> `plugin.json`, `marketplace.json`의 version과 git tag는 항상 일치해야 한다.

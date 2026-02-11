@@ -12,7 +12,7 @@
       "name": "pr-reviewer",
       "source": "./",
       "description": "GitHub PR을 자동 리뷰하고 인라인 코멘트를 게시하는 플러그인",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "author": {
         "name": "nathankim0"
       },
