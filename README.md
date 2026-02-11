@@ -132,13 +132,11 @@ PR: fix: 로그인 세션 만료 시 리다이렉트 누락 수정
 
 이전 리뷰 스레드를 GraphQL API로 조회하여 반영 여부를 확인합니다. 반영 완료된 스레드는 자동 resolve 처리합니다.
 
-```
-| # | 파일               | 이전 코멘트 (요약)         | 상태                     |
-|---|--------------------|----------------------------|--------------------------|
-| 1 | AuthProvider.tsx    | useEffect 의존성 누락      | Resolved (이전)          |
-| 2 | SessionGuard.tsx    | 에러 바운더리 미처리       | Resolved (방금) - 반영됨 |
-| 3 | api/auth.ts         | 토큰 갱신 경쟁 조건       | 미반영                   |
-```
+| # | 파일 | 이전 코멘트 (요약) | 상태 |
+|---|------|-------------------|------|
+| 1 | AuthProvider.tsx | useEffect 의존성 누락 | Resolved (이전) |
+| 2 | SessionGuard.tsx | 에러 바운더리 미처리 | Resolved (방금) - 반영됨 |
+| 3 | api/auth.ts | 토큰 갱신 경쟁 조건 | 미반영 |
 
 **워크트리 생성 + 병렬 코드 리뷰**
 
@@ -192,23 +190,19 @@ PR #42: fix: 로그인 세션 만료 시 리다이렉트 누락 수정
 
 **미해결 리뷰 코멘트 수집**
 
-```
 미해결 리뷰 코멘트: 2개
 
-| # | 파일             | 라인 | 작성자     | 내용 (요약)                    |
-|---|------------------|------|------------|--------------------------------|
-| 1 | api/auth.ts      | 45   | dev-park   | refreshToken 중복 요청 방지    |
-| 2 | AuthProvider.tsx  | 63   | dev-park   | SESSION_TIMEOUT 상수화         |
-```
+| # | 파일 | 라인 | 작성자 | 내용 (요약) |
+|---|------|------|--------|-------------|
+| 1 | api/auth.ts | 45 | dev-park | refreshToken 중복 요청 방지 |
+| 2 | AuthProvider.tsx | 63 | dev-park | SESSION_TIMEOUT 상수화 |
 
 **코멘트 분석 및 분류**
 
-```
-| # | 분류        | 파일                 | 계획                              |
-|---|-------------|----------------------|-----------------------------------|
-| 1 | code_change | api/auth.ts:45       | mutex 패턴으로 중복 요청 방지     |
-| 2 | code_change | AuthProvider.tsx:63   | SESSION_TIMEOUT 상수 분리         |
-```
+| # | 분류 | 파일 | 계획 |
+|---|------|------|------|
+| 1 | code_change | api/auth.ts:45 | mutex 패턴으로 중복 요청 방지 |
+| 2 | code_change | AuthProvider.tsx:63 | SESSION_TIMEOUT 상수 분리 |
 
 **코드 수정 + 답글 게시**
 
