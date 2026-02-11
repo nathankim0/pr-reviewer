@@ -390,6 +390,47 @@ JSON
 
 게시 성공 시 PR URL과 리뷰 액션을 안내하세요.
 
+### Step 6.5: APPROVE 시 미해결 스레드 자동 resolve
+
+**APPROVE 리뷰를 게시한 경우에만 실행합니다.** (REQUEST_CHANGES, COMMENT인 경우 건너뜁니다.)
+
+APPROVE = "모든 이슈가 해결됨"을 의미하므로, 현재 사용자가 남긴 **모든 미해결 스레드를 resolve** 처리합니다.
+
+**1) 미해결 스레드 조회**:
+
+Step 1에서 수집한 현재 사용자 로그인과 리뷰 스레드 정보를 사용하되, Step 2.5에서 이미 resolve한 스레드는 제외합니다. 만약 Step 1 이후 새 코멘트가 추가되었을 가능성이 있으므로, **GraphQL로 최신 미해결 스레드를 다시 조회**합니다:
+
+```bash
+gh api graphql -F owner='{owner}' -F repo='{repo}' -F number={number} -f query='
+query($owner: String!, $repo: String!, $number: Int!) {
+  repository(owner: $owner, name: $repo) {
+    pullRequest(number: $number) {
+      reviewThreads(first: 100) {
+        nodes {
+          id
+          isResolved
+          comments(first: 1) {
+            nodes {
+              author { login }
+            }
+          }
+        }
+      }
+    }
+  }
+}'
+```
+
+**2) 현재 사용자의 미해결 스레드 필터링 및 resolve**:
+
+첫 번째 코멘트의 `author.login`이 현재 사용자인 미해결(`isResolved === false`) 스레드를 모두 resolve 처리합니다:
+
+```bash
+gh api graphql -f query='mutation { resolveReviewThread(input: { threadId: "{thread_node_id}" }) { thread { isResolved } } }'
+```
+
+**병렬로 실행하세요.** resolve 결과 수를 기록하여 Step 7 완료 메시지에 포함합니다.
+
 ### Step 7: 정리
 
 워크트리를 제거합니다:
