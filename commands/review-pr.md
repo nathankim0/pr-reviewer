@@ -5,10 +5,13 @@
 ## 사용법
 
 ```
-/pr-reviewer:review-pr <PR_URL>
+/pr-reviewer:review-pr [PR_URL 또는 PR_번호]
 ```
 
-**예시**: `/pr-reviewer:review-pr https://github.com/owner/repo/pull/123`
+**예시**:
+- `/pr-reviewer:review-pr https://github.com/owner/repo/pull/123`
+- `/pr-reviewer:review-pr 123`
+- `/pr-reviewer:review-pr` (현재 브랜치의 PR 자동 감지)
 
 ---
 
@@ -36,11 +39,21 @@ allowed-tools: Bash(gh *), Bash(git worktree *), Bash(git *), Bash(rm -rf /tmp/p
 
 ## 입력 파싱
 
-사용자가 제공한 인자에서 PR URL을 파싱하세요: `$ARGUMENTS`
+사용자 인자: `$ARGUMENTS`
 
-PR URL 형식: `https://github.com/{owner}/{repo}/pull/{number}`
+**PR 식별**:
+1. `$ARGUMENTS`가 GitHub PR URL (`https://github.com/{owner}/{repo}/pull/{number}`)이면 → `owner`, `repo`, `number` 추출
+2. `$ARGUMENTS`가 숫자면 → PR 번호로 사용, `owner`/`repo`는 현재 레포에서 추출:
+   ```bash
+   gh repo view --json owner,name --jq '.owner.login + "/" + .name'
+   ```
+3. `$ARGUMENTS`가 비어있으면 → 현재 브랜치의 PR 자동 감지:
+   ```bash
+   gh pr view --json number,url --jq '.number'
+   ```
+   `owner`/`repo`도 현재 레포에서 추출합니다.
 
-이 URL에서 `owner`, `repo`, `number`를 추출하세요. URL이 유효하지 않으면 올바른 형식을 안내하고 중단하세요.
+위 방법으로 `owner`, `repo`, `number`를 확보할 수 없으면 올바른 형식을 안내하고 중단하세요.
 
 ---
 
