@@ -1,3 +1,8 @@
+---
+name: review-pr
+description: GitHub PR을 자동 리뷰하고 인라인 코멘트를 게시합니다
+---
+
 # PR Code Reviewer
 
 자동으로 PR을 리뷰하고 GitHub에 인라인 코멘트를 게시합니다.
