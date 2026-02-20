@@ -205,7 +205,7 @@ gh api graphql -f query='mutation { resolveReviewThread(input: { threadId: "{thr
 
 **!! 절대로 직접 리뷰를 작성하지 마세요 !!** 반드시 아래의 Task 에이전트를 실행하여 리뷰를 수행해야 합니다. 당신이 diff를 읽고 직접 이슈를 작성하는 것은 금지됩니다.
 
-**Step 1.5에서 선택한 리뷰 관점에 따라** 해당 에이전트만 실행합니다. 각 에이전트(Task 도구 사용)에게 다음 정보를 제공하세요:
+**Step 1.5에서 선택한 리뷰 관점에 따라** 해당 에이전트만 실행합니다. 각 에이전트(Task 도구 사용, **model: "sonnet"**)에게 다음 정보를 제공하세요:
 - 리뷰 디렉토리 경로 (`$REVIEW_DIR`)
 - 변경된 파일 목록
 - PR diff 내용
