@@ -22,6 +22,23 @@
 
 > `plugin.json`, `marketplace.json`의 version과 git tag는 항상 일치해야 한다.
 
+## Task 에이전트 모델 설정
+
+- `review-pr`, `resolve-reviews` 모두 Task 에이전트 실행 시 `model: "sonnet"`을 사용한다.
+- 프롬프트에 `model: "sonnet"`으로 명시하면 Claude가 Task 도구 호출 시 해당 파라미터를 전달한다.
+- 사용 가능한 모델: `"sonnet"`, `"opus"`, `"haiku"` (Task 도구의 model 파라미터)
+
+## commands/*.md 작성 규칙
+
+- 모든 command 파일은 반드시 **YAML frontmatter**를 포함해야 한다:
+  ```yaml
+  ---
+  name: command-name
+  description: 스킬 설명 (한 줄)
+  ---
+  ```
+- frontmatter가 없으면 Claude Code의 **스킬 discovery 목록에 노출되지 않아** 스킬 호출이 실패할 수 있다.
+
 ## 버전 올리는 기준 (Semantic Versioning)
 
 | 구분 | 기준 | 커밋 접두사 |
